@@ -93,29 +93,60 @@ mall-vue/
 └── package.json
 ```
 
-## 🚢 部署（Docker + Jenkins）
+## 🚢 部署（Jenkins：构建 dist + rsync 到 mall nginx）
 
-项目已内置 CI/CD 所需的文件：
+前端**复用 `mall` 后端已部署的 nginx**（容器名 `nginx`，宿主监听 `8088`，前端静态根 `/data/mall/web`，`/api` 由该 nginx 反代到网关）。Jenkins 只负责：**在 node 容器内构建 `dist` → 用 rsync over ssh 同步到 `/data/mall/web`**，不再构建/启动第二个 nginx。
 
-| 文件 | 说明 |
-| ---- | ---- |
-| `Jenkinsfile` | Jenkins 声明式流水线：安装依赖 → 前端构建 → Docker 镜像构建 →（可选）推送仓库 → SSH 部署容器 |
-| `Dockerfile` | 多阶段镜像（`node:22` 构建 → `nginx:1.27` 承载静态产物） |
-| `nginx/default.conf` | 容器内 nginx 配置：SPA 路由回退 + `/assets/*` 长缓存 |
-| `.dockerignore` | 构建上下文忽略项 |
+> CI 文件：`Jenkinsfile`（流水线）、`.npmrc`（npm 国内镜像源）。`Dockerfile` / `nginx/default.conf` 为可选的“自包含镜像”用法，当前流水线已不再使用。
 
-**本地构建镜像**
+### Jenkins 构建参数
 
+| 参数 | 默认值 | 说明 |
+| ---- | ---- | ---- |
+| `BUILD_MODE` | `pro` | 对应 `pnpm build:pro` / `pnpm build:test` |
+| `STATIC_ROOT` | `/data/mall/web` | mall nginx 的宿主静态根目录（部署目标） |
+| `DEPLOY_HOST` | 空 | 部署机 IP；留空=只构建不部署 |
+| `DEPLOY_USER` | `root` | 部署机 SSH 登录用户 |
+| `DEPLOY_SSH_PORT` | `22` | SSH 端口 |
+| `DEPLOY_SSH_CREDENTIALS_ID` | `deploy-ssh-key` | Jenkins 里的 SSH 私钥凭据 ID |
+
+### 🔑 SSH 公钥/私钥配置（部署必需）
+
+rsync over ssh 需要一对密钥：**公钥**放到部署机，**私钥**粘到 Jenkins 凭据，二者必须配对。
+
+**1. 生成密钥对**（任意机器上执行）
 ```bash
-docker build -t mall-web --build-arg BUILD_MODE=pro .
-docker run -d --name mall-web -p 8080:80 mall-web
+ssh-keygen -t ed25519 -C "mall-web-deploy" -f ~/.ssh/mall_web_deploy
+# passphrase 直接回车两次，留空（Jenkins 非交互 SSH 才能通过）
+```
+生成两个文件：
+- 私钥 `~/.ssh/mall_web_deploy` → **粘到 Jenkins 凭据**
+- 公钥 `~/.ssh/mall_web_deploy.pub` → **放到部署机**
+
+**2. 公钥加到部署机**
+```bash
+mkdir -p ~/.ssh && chmod 700 ~/.ssh
+cat ~/.ssh/mall_web_deploy.pub >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys
 ```
 
-**Jenkins 部署要点**（详见 `Jenkinsfile` 头部注释）：
+**3. 私钥粘到 Jenkins 凭据**
+`Manage Jenkins → Credentials → Global credentials → Add Credentials`：
+- Kind：**SSH Username with private key**
+- ID：`deploy-ssh-key`
+- Username：部署机登录用户（如 `xiao` / `root`）
+- Private Key：**私钥**内容（`-----BEGIN OPENSSH PRIVATE KEY-----` … `-----END OPENSSH PRIVATE KEY-----`）。⚠️ 不要贴公钥 `.pub`。
 
-1. 部署主机与已部署的 nginx 接入同一 docker 网络（`DOCKER_NETWORK`），nginx 直接按容器名 `http://mall-web` 转发即可。
-2. 若使用镜像仓库，填 `REGISTRY_URL` 并开启 `PUSH_REGISTRY`；否则 Jenkins 会把镜像 `docker save | ssh host docker load` 直接传过去，无需仓库。
-3. 服务器地址、端口、凭据均为 Jenkins 运行时参数，仓库内**未硬编码任何私有信息**。
+**4. 校验：三处必须一致**
+| 位置 | 内容 |
+| ---- | ---- |
+| 部署机 `~/.ssh/authorized_keys` | 公钥 |
+| Jenkins 凭据的 Private Key | 与上面的公钥**配对**的私钥 |
+| 部署机 `/data/mall/web` | 对该 SSH 用户**可写** |
+
+**常见报错**
+- `Load key ... error in libcrypto`：私钥贴成了公钥，或私钥带口令 → `ssh-keygen -p -f <私钥>`（回车两次设空）后重贴。
+- `Permission denied (publickey)`：公钥/私钥不配对，或 `authorized_keys` 里是占位文本。
+- `Permission denied, please try again`：确认用户名、`authorized_keys` 权限（`.ssh=700`、`authorized_keys=600`）、公钥内容正确。
 
 ## License
 
