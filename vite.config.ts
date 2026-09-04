@@ -12,6 +12,7 @@ export default defineConfig(({ command, mode }) => {
   // 获取各种环境下的对应变量
   const env = loadEnv(mode, process.cwd())
   return {
+    base: '/admin/',
     plugins: [
       vue(),
       // Element Plus 按需引入（组件自动导入 + 样式按需加载）
