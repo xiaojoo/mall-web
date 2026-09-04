@@ -142,11 +142,11 @@ const togglePasswordVisibility = () => {
   passwordVisible.value = !passwordVisible.value
 }
 
-// 加载验证码图片（地址取自 .env 的 VITE_SERVE，不再写死）
+// 加载验证码图片（同源 /api：dev 走 vite 代理、生产走 nginx 转发网关）
 const loadCaptcha = () => {
   const uuid = getUUID()
   loginForm.uuid = uuid
-  captchaSrc.value = `${import.meta.env.VITE_SERVE}/api/captcha.jpg?uuid=${uuid}`
+  captchaSrc.value = `${import.meta.env.VITE_APP_BASE_API || ''}/captcha.jpg?uuid=${uuid}`
 }
 
 // 刷新验证码
