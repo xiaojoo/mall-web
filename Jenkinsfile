@@ -26,7 +26,7 @@ pipeline {
 
     parameters {
         choice(name: 'BUILD_MODE', choices: ['pro', 'test'], description: '构建模式，对应 pnpm build:pro / build:test')
-        string(name: 'STATIC_ROOT', defaultValue: '/data/mall/web-admin', description: 'mall nginx 的宿主静态根目录（后台 /admin/ 部署目标）')
+        string(name: 'STATIC_ROOT', defaultValue: '/data/mall/mall-admin', description: 'mall nginx 的宿主静态根目录（后台 /admin/ 部署目标）')
         string(name: 'DEPLOY_HOST', defaultValue: '192.168.31.194', description: '目标主机 IP/域名；留空则只构建不部署')
         string(name: 'DEPLOY_USER', defaultValue: 'xiao', description: 'SSH 部署用户')
         string(name: 'DEPLOY_SSH_PORT', defaultValue: '22', description: 'SSH 端口')
