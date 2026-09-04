@@ -43,7 +43,21 @@ pipeline {
 
         stage('构建 dist (node 容器)') {
             steps {
-                sh "docker run --rm --network host -v \"\$PWD\":/app -w /app -u \"\$(id -u):\$(id -g)\" -e HOME=/tmp -e NPM_CONFIG_REGISTRY=https://registry.npmmirror.com node:22-alpine sh -c 'npm install -g --prefix /tmp/pnpm-global pnpm@9.15.0 >/dev/null 2>&1 && export PATH=/tmp/pnpm-global/bin:\$PATH && pnpm install --frozen-lockfile && pnpm build:${params.BUILD_MODE}'"
+                sh """
+                  docker run --rm --network host \\
+                    -v "\$PWD":/app -w /app \\
+                    -u "\$(id -u):\$(id -g)" -e HOME=/tmp \\
+                    -e NPM_CONFIG_REGISTRY=https://registry.npmmirror.com \\
+                    -e HTTP_PROXY=http://192.168.31.251:7890 \\
+                    -e HTTPS_PROXY=http://192.168.31.251:7890 \\
+                    -e http_proxy=http://192.168.31.251:7890 \\
+                    -e https_proxy=http://192.168.31.251:7890 \\
+                    -e NO_PROXY=localhost,127.0.0.1 \\
+                    -e no_proxy=localhost,127.0.0.1 \\
+                    -e npm_config_proxy=http://192.168.31.251:7890 \\
+                    -e npm_config_https_proxy=http://192.168.31.251:7890 \\
+                    node:22-alpine sh -c 'npm install -g --prefix /tmp/pnpm-global pnpm@9.15.0 >/dev/null 2>&1 && export PATH=/tmp/pnpm-global/bin:\$PATH && pnpm install --frozen-lockfile && pnpm build:${params.BUILD_MODE}'
+                """
                 sh 'test -d dist && echo "[OK] dist 目录存在"'
                 archiveArtifacts artifacts: 'dist/**', fingerprint: true
             }
