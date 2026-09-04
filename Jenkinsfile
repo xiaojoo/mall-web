@@ -68,10 +68,10 @@ pipeline {
                 expression { params.DEPLOY_HOST?.trim()?.length() > 0 }
             }
             steps {
-                sshagent([env.DEPLOY_SSH_CREDENTIALS_ID]) {
+                withCredentials([sshUserPrivateKey(credentialsId: env.DEPLOY_SSH_CREDENTIALS_ID, keyFileVariable: 'SSH_KEY')]) {
                     script {
                         def remote = "${params.DEPLOY_USER}@${params.DEPLOY_HOST}"
-                        def ssher = "-p ${params.DEPLOY_SSH_PORT} -o StrictHostKeyChecking=no"
+                        def ssher = "-i \$SSH_KEY -p ${params.DEPLOY_SSH_PORT} -o StrictHostKeyChecking=no"
                         def root = params.STATIC_ROOT.trim()
                         sh """
                             set -e
