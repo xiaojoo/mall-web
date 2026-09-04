@@ -2,13 +2,13 @@
 // mall-web 前端 Jenkins 流水线
 //
 // 流程:
-//   Checkout(内置) → 取镜像Tag → 依赖安装 → 前端构建 → Docker 构建
+//   Checkout(内置) → 取镜像Tag → Docker 构建(依赖安装+前端构建在镜像内)
 //                  → (可选)推送镜像仓库 → 通过 SSH 部署容器到 Docker 主机
 //
 // 前置条件:
 //   1. Jenkins 插件: Pipeline、Credentials Binding、SSH Agent、
 //      Timestamper、Blue Ocean(可选)、Workspace Cleanup(可选)
-//   2. Jenkins Agent 节点需具备: git、node(>=22)、corepack、docker CLI
+//   2. Jenkins Agent 节点需具备: git、docker CLI（依赖安装/前端构建在镜像内的 node 完成，无需 node/corepack）
 //   3. 在 Jenkins "凭据" 中创建:
 //        - username/password 类型, 凭据 ID: registry-credentials
 //          (镜像仓库账号; 仅当使用 PUSH_REGISTRY 时需要)
@@ -68,20 +68,6 @@ pipeline {
                     env.IMAGE_NAME = reg.isEmpty() ? params.APP_NAME : "${reg}/${params.APP_NAME}"
                     echo "=> 镜像: ${env.IMAGE_NAME}:${env.IMAGE_TAG}  模式: ${params.BUILD_MODE}  部署主机: ${host.isEmpty() ? '(未配置,跳过部署)' : host}"
                 }
-            }
-        }
-
-        stage('依赖安装') {
-            steps {
-                sh 'corepack enable && corepack prepare pnpm@9.15.0 --activate'
-                sh 'pnpm install --frozen-lockfile'
-            }
-        }
-
-        stage('前端构建') {
-            steps {
-                // build 脚本为 build:test / build:pro
-                sh "pnpm build:${params.BUILD_MODE}"
             }
         }
 
