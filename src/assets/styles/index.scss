@@ -1,0 +1,24 @@
+@import url('reset.scss');
+@import url('scroll.scss');
+
+/* ============ 全局布局兜底 ============ */
+
+/* 视口小于布局最小宽度（80rem）时，body 出现横向滚动而非挤压内容 */
+html,
+body {
+  min-width: 80rem;
+  overflow-x: auto;
+}
+
+/* 折叠菜单宽度与侧边栏 $base-menu-min-with(3.9375rem) 对齐，
+   Element Plus 默认折叠宽度为 64px，差 1px 会导致横向滚动条/错位 */
+.el-menu--collapse {
+  --el-menu-collapse-width: 3.9375rem;
+  width: var(--el-menu-collapse-width);
+}
+
+/* NProgress 进度条平滑过渡：默认每 200ms 阶梯跳变（trickle），
+   无过渡动画会显得一顿一顿；加轻微 transition 后推进顺滑 */
+#nprogress .bar {
+  transition: transform 0.08s ease-out;
+}

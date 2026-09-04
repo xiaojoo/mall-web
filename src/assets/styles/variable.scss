@@ -1,0 +1,73 @@
+//:root {
+//  /* 颜色系统 */
+//  --primary-color: #409eff; /* 主色 */
+//  --secondary-color: #67c23a; /* 次色 */
+//  --error-color: #f56c6c; /* 错误色 */
+//  --warning-color: #e6a23c; /* 警告色 */
+//  --success-color: #67c23a; /* 成功色 */
+//  --info-color: #909399; /* 信息色 */
+//  --background-color: #f5f5f5; /* 背景色 */
+//  --text-color-primary: #303133; /* 主文本色 */
+//  --text-color-secondary: #606266; /* 次文本色 */
+//  --border-color: #dcdfe6; /* 边框色 */
+//
+//  /* 字体系统 */
+//  --font-size-base: 1rem; /* 基础字体大小 */
+//  --font-size-small: 0.875rem; /* 小字体大小 */
+//  --font-size-large: 1.25rem; /* 大字体大小 */
+//  --line-height: 1.5; /* 行高 */
+//
+//  /* 间距 */
+//  --spacing-small: 0.5rem; /* 小间距 */
+//  --spacing-base: 1rem; /* 基础间距 */
+//  --spacing-large: 1.5rem; /* 大间距 */
+//
+//  /* 圆角 */
+//  --border-radius-small: 0.25rem; /* 小圆角 */
+//  --border-radius-base: 0.5rem; /* 基础圆角 */
+//  --border-radius-large: 1rem; /* 大圆角 */
+//
+//  /* 阴影 */
+//  --box-shadow-base: 0 2px 12px rgba(0, 0, 0, 0.1); /* 基础阴影 */
+//  --box-shadow-hover: 0 4px 20px rgba(0, 0, 0, 0.15); /* 悬停阴影 */
+//}
+
+$base-menu-width: 16.25rem; // 菜单宽度
+$base-bg-color: #f5f5f5; // 背景色
+$base-bar-bg-color: #0c2556; // 左侧背景色
+$base-menu-min-with: 3.9375rem; // 最测菜单最小宽度
+$base-bar-height: 4.375rem;
+$base-menu-logo-height: 4.375rem;
+$base-logo-title-font-size: 1.5rem;
+
+// 左侧菜单保持左对齐（!important 覆盖 EP 的嵌套内联 padding-left，
+// 否则三级菜单会随机出现缩进、层级间不一致）
+.el-menu--vertical:not(.el-menu--collapse):not(.el-menu--popup-container)
+.el-menu-item,
+.el-menu--vertical:not(.el-menu--collapse):not(.el-menu--popup-container)
+.el-menu-item-group__title,
+.el-menu--vertical:not(.el-menu--collapse):not(.el-menu--popup-container)
+.el-sub-menu__title {
+  padding-left: var(--el-menu-base-level-padding) !important;
+  white-space: nowrap;
+
+  .el-sub-menu__title {
+    padding-left: 0 !important;
+  }
+}
+
+// 选中高亮：黑色背景只加在【最近一级】父级菜单标题上（当前选中项保留 EP 默认样式）
+// :has(> ul > .el-menu-item.is-active) 只命中“直接包含选中项”的那一级：
+// 点三级菜单只亮二级，点二级只亮一级，不会逐级向上全亮
+.el-menu--vertical,
+.el-menu--popup {
+  .el-sub-menu.is-active:has(> ul > .el-menu-item.is-active) > .el-sub-menu__title {
+    background-color: #000 !important;
+    color: #fff !important;
+  }
+}
+
+
+.el-form--inline .el-form-item {
+  margin-right: 10px !important;
+}

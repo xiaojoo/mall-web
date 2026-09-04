@@ -1,0 +1,232 @@
+<template>
+  <div class="mod-config">
+    <el-form
+      :inline="true"
+      :model="dataForm"
+      @keyup.enter.native="getDataList()"
+    >
+      <el-form-item>
+        <el-input
+          v-model="dataForm.key"
+          placeholder="参数名"
+          clearable
+        ></el-input>
+      </el-form-item>
+      <el-form-item>
+        <el-button @click="getDataList()">查询</el-button>
+        <el-button type="primary" @click="addOrUpdateHandle()">新增</el-button>
+        <el-button
+          type="danger"
+          @click="deleteHandle()"
+          :disabled="dataListSelections.length <= 0"
+          v-perms="'coupon:seckillskunotice:delete'"
+        >
+          批量删除
+        </el-button>
+      </el-form-item>
+    </el-form>
+    <el-table
+      :data="dataList"
+      border
+      v-loading="dataListLoading"
+      @selection-change="selectionChangeHandle"
+      style="width: 100%"
+    >
+      <el-table-column
+        type="selection"
+        header-align="center"
+        align="center"
+        width="50"
+      ></el-table-column>
+      <el-table-column
+        prop="id"
+        header-align="center"
+        align="center"
+        label="id"
+      ></el-table-column>
+      <el-table-column
+        prop="memberId"
+        header-align="center"
+        align="center"
+        label="会员Id"
+      ></el-table-column>
+      <el-table-column
+        prop="skuId"
+        header-align="center"
+        align="center"
+        label="sku_id"
+      ></el-table-column>
+      <el-table-column
+        prop="sessionId"
+        header-align="center"
+        align="center"
+        label="活动场次id"
+      ></el-table-column>
+      <el-table-column
+        prop="subcribeTime"
+        header-align="center"
+        align="center"
+        label="订阅时间"
+      ></el-table-column>
+      <el-table-column
+        prop="sendTime"
+        header-align="center"
+        align="center"
+        label="发送时间"
+      ></el-table-column>
+      <el-table-column
+        prop="noticeType"
+        header-align="center"
+        align="center"
+        label="通知[0-短信，1-邮件]"
+      ></el-table-column>
+      <el-table-column
+        fixed="right"
+        header-align="center"
+        align="center"
+        width="150"
+        label="操作"
+      >
+        <template #default="scope">
+          <el-button
+            size="small"
+            @click="addOrUpdateHandle(scope.row.id)"
+            v-perms="'coupon:seckillskunotice:update'"
+          >
+            修改
+          </el-button>
+          <el-button
+            size="small"
+            @click="deleteHandle(scope.row.id)"
+            v-perms="'coupon:seckillskunotice:delete'"
+          >
+            删除
+          </el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+    <div class="pagination-box">
+      <el-pagination
+        @size-change="sizeChangeHandle"
+        @current-change="currentChangeHandle"
+        :current-page="pageIndex"
+        :page-sizes="[10, 20, 50, 100]"
+        :page-size="pageSize"
+        :total="totalPage"
+        layout="total, sizes, prev, pager, next, jumper"
+      />
+    </div>
+    <Add
+      v-model="addOrUpdateVisible"
+      ref="addOrUpdate"
+      @refreshDataList="getDataList"
+    />
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, nextTick, onMounted } from 'vue'
+
+import Add from './add.vue'
+import {
+  reqSeckillSkuNoticeDelete,
+  reqSeckillSkuNoticeList,
+} from '@/api/coupon/seckillskunotice'
+
+const dataForm = ref({
+  key: '',
+})
+const dataList = ref([])
+const pageIndex = ref(1)
+const pageSize = ref(10)
+const totalPage = ref(0)
+const dataListLoading = ref(false)
+const dataListSelections = ref<any[]>([])
+const addOrUpdateVisible = ref(false)
+
+const addOrUpdate = ref()
+
+const getDataList = async () => {
+  dataListLoading.value = true
+  try {
+    const response = await reqSeckillSkuNoticeList(
+      pageIndex.value,
+      pageSize.value,
+      dataForm.value.key,
+    )
+    if (response && response.code === 200) {
+      dataList.value = response.data.list
+      totalPage.value = response.data.totalCount
+    } else {
+      dataList.value = []
+      totalPage.value = 0
+    }
+    dataListLoading.value = false
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+// 删除
+const deleteHandle = async (id?: number) => {
+  const ids = id ? [id] : dataListSelections.value.map((item) => item.id)
+  try {
+    await ElMessageBox.confirm(
+      `确定对[id=${ids.join(',')}]进行[${id ? '删除' : '批量删除'}]操作?`,
+      '提示',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+      },
+    )
+    const response = await reqSeckillSkuNoticeDelete(ids)
+    if (response && response.code === 200) {
+      ElMessage({
+        type: 'success',
+        message: '秒杀配置删除成功',
+        duration: 1500,
+        onClose: () => {
+          getDataList()
+        },
+      })
+    } else {
+      ElMessage.error(response.msg)
+    }
+  } catch (error) {
+    ElMessage.info('已取消秒杀配置删除')
+  }
+}
+
+// 每页数
+const sizeChangeHandle = (val: any) => {
+  pageSize.value = val
+  pageIndex.value = 1
+  getDataList()
+}
+
+// 当前页
+const currentChangeHandle = (val: any) => {
+  pageIndex.value = val
+  getDataList()
+}
+
+// 多选
+const selectionChangeHandle = (val: any) => {
+  dataListSelections.value = val
+}
+
+// 新增/修改
+const addOrUpdateHandle = (id?: any) => {
+  addOrUpdateVisible.value = true
+  nextTick(() => {
+    addOrUpdate.value?.init(id)
+  })
+}
+
+onMounted(() => {
+  getDataList()
+})
+</script>
+
+<style scoped lang="scss"></style>
