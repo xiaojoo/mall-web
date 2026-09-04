@@ -71,17 +71,17 @@ pipeline {
                 withCredentials([sshUserPrivateKey(credentialsId: params.DEPLOY_SSH_CREDENTIALS_ID, keyFileVariable: 'SSH_KEY')]) {
                     script {
                         def remote = "${params.DEPLOY_USER}@${params.DEPLOY_HOST}"
-                        def ssher = "-i \$SSH_KEY -p ${params.DEPLOY_SSH_PORT} -o StrictHostKeyChecking=no"
+                        
                         def root = params.STATIC_ROOT.trim()
                         sh """
                             set -e
                             echo '==> 部署到 ${remote}:${root}/'
                             if command -v rsync >/dev/null 2>&1; then
-                                rsync -az --delete -e 'ssh ${ssher}' dist/ ${remote}:${root}/
+                                rsync -az --delete -e "ssh -i \$SSH_KEY -p ${params.DEPLOY_SSH_PORT} -o StrictHostKeyChecking=no" dist/ ${remote}:${root}/
                                 echo '[OK] rsync 部署完成'
                             else
                                 echo '==> rsync 不可用，改用 tar|ssh'
-                                tar -C dist -cf - . | ssh ${ssher} ${remote} 'tar -C ${root} -xf -'
+                                tar -C dist -cf - . | ssh -i \$SSH_KEY -p ${params.DEPLOY_SSH_PORT} -o StrictHostKeyChecking=no ${remote} 'tar -C ${root} -xf -'
                                 echo '[OK] tar|ssh 部署完成（不会自动删除多余旧文件）'
                             fi
                         """
