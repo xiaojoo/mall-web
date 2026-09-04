@@ -5,7 +5,6 @@
 # 用法:
 #   docker build -t mall-web --build-arg BUILD_MODE=pro .
 # ---------------------------------------------------------------
-# syntax=docker/dockerfile:1
 
 # ---------- 构建阶段 ----------
 FROM node:22-alpine AS build

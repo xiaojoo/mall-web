@@ -7,7 +7,7 @@
 //
 // 前置条件:
 //   1. Jenkins 插件: Pipeline、Credentials Binding、SSH Agent、
-//      Timestamper、AnsiColor、Blue Ocean(可选)、Workspace Cleanup
+//      Timestamper、Blue Ocean(可选)、Workspace Cleanup(可选)
 //   2. Jenkins Agent 节点需具备: git、node(>=22)、corepack、docker CLI
 //   3. 在 Jenkins "凭据" 中创建:
 //        - username/password 类型, 凭据 ID: registry-credentials
@@ -28,7 +28,6 @@ pipeline {
     options {
         timestamps()
         disableConcurrentBuilds()
-        ansiColor('xterm')
         buildDiscarder(logRotator(numToKeepStr: '10'))
     }
 
@@ -62,16 +61,19 @@ pipeline {
             steps {
                 script {
                     def shortSha = env.GIT_COMMIT ? env.GIT_COMMIT.take(7) : 'build'
-                    env.IMAGE_TAG = params.IMAGE_TAG ?: shortSha
-                    env.IMAGE_NAME = params.REGISTRY_URL ? "${params.REGISTRY_URL}/${params.APP_NAME}" : params.APP_NAME
-                    echo "=> 镜像: ${env.IMAGE_NAME}:${env.IMAGE_TAG}  模式: ${params.BUILD_MODE}  部署主机: ${params.DEPLOY_HOST ?: '(未配置,跳过部署)'}"
+                    def tag = params.IMAGE_TAG.trim()
+                    def reg = params.REGISTRY_URL.trim()
+                    def host = params.DEPLOY_HOST.trim()
+                    env.IMAGE_TAG = tag.isEmpty() ? shortSha : tag
+                    env.IMAGE_NAME = reg.isEmpty() ? params.APP_NAME : "${reg}/${params.APP_NAME}"
+                    echo "=> 镜像: ${env.IMAGE_NAME}:${env.IMAGE_TAG}  模式: ${params.BUILD_MODE}  部署主机: ${host.isEmpty() ? '(未配置,跳过部署)' : host}"
                 }
             }
         }
 
         stage('依赖安装') {
             steps {
-                sh 'corepack enable'
+                sh 'corepack enable && corepack prepare pnpm@9.15.0 --activate'
                 sh 'pnpm install --frozen-lockfile'
             }
         }
@@ -91,7 +93,7 @@ pipeline {
 
         stage('推送镜像仓库') {
             when {
-                expression { params.PUSH_REGISTRY && params.REGISTRY_URL }
+                expression { params.PUSH_REGISTRY && params.REGISTRY_URL?.trim()?.length() > 0 }
             }
             steps {
                 withCredentials([usernamePassword(credentialsId: env.REGISTRY_CREDENTIALS_ID,
@@ -110,7 +112,7 @@ pipeline {
 
         stage('部署到 Docker 主机') {
             when {
-                expression { params.DEPLOY_HOST }
+                expression { params.DEPLOY_HOST?.trim()?.length() > 0 }
             }
             steps {
                 sshagent([env.DEPLOY_SSH_CREDENTIALS_ID]) {
@@ -119,7 +121,7 @@ pipeline {
                         def sshOpts = "-p ${params.DEPLOY_SSH_PORT} -o StrictHostKeyChecking=no"
 
                         // 无仓库时，把本地镜像直接传到部署主机
-                        if (!params.REGISTRY_URL) {
+                        if (params.REGISTRY_URL?.trim()?.length() == 0) {
                             sh "docker save ${env.IMAGE_NAME}:${env.IMAGE_TAG} | ssh ${sshOpts} ${remote} 'docker load'"
                         }
 
@@ -130,8 +132,10 @@ pipeline {
                             IMG="${env.IMAGE_NAME}:${env.IMAGE_TAG}"
                             NET="${params.DOCKER_NETWORK}"
                             PORT="${params.HOST_PORT}"
+                            REG="${params.REGISTRY_URL}"
                             docker rm -f "\$APP" 2>/dev/null || true
                             docker network inspect "\$NET" >/dev/null 2>&1 || docker network create "\$NET"
+                            if [ -n "\$REG" ]; then docker pull "\$IMG"; fi
                             PUBLISH=""
                             [ -n "\$PORT" ] && PUBLISH="-p \${PORT}:80"
                             docker run -d --name "\$APP" --restart unless-stopped \$PUBLISH --network "\$NET" "\$IMG"
@@ -146,7 +150,7 @@ pipeline {
 
     post {
         always {
-            cleanWs()
+            deleteDir()
         }
     }
 }
