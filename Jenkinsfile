@@ -43,7 +43,7 @@ pipeline {
 
         stage('构建 dist (node 容器)') {
             steps {
-                sh "docker run --rm -v \"\$PWD\":/app -w /app -e COREPACK_NPM_REGISTRY=https://registry.npmmirror.com -e NPM_CONFIG_REGISTRY=https://registry.npmmirror.com node:22-alpine sh -c 'corepack enable && corepack prepare pnpm@9.15.0 --activate && pnpm install --frozen-lockfile && pnpm build:${params.BUILD_MODE}'"
+                sh "docker run --rm --network host -v \"\$PWD\":/app -w /app -e COREPACK_NPM_REGISTRY=https://registry.npmmirror.com -e NPM_CONFIG_REGISTRY=https://registry.npmmirror.com node:22-alpine sh -c 'corepack enable && corepack prepare pnpm@9.15.0 --activate && pnpm install --frozen-lockfile && pnpm build:${params.BUILD_MODE}'"
                 sh 'test -d dist && echo "[OK] dist 目录存在"'
                 archiveArtifacts artifacts: 'dist/**', fingerprint: true
             }
