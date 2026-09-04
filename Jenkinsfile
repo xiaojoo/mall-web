@@ -30,10 +30,7 @@ pipeline {
         string(name: 'DEPLOY_HOST', defaultValue: '', description: '目标主机 IP/域名；留空则只构建不部署')
         string(name: 'DEPLOY_USER', defaultValue: 'root', description: 'SSH 部署用户')
         string(name: 'DEPLOY_SSH_PORT', defaultValue: '22', description: 'SSH 端口')
-    }
-
-    environment {
-        DEPLOY_SSH_CREDENTIALS_ID = 'deploy-ssh-key'
+        string(name: 'DEPLOY_SSH_CREDENTIALS_ID', defaultValue: 'deploy-ssh-key', description: 'SSH 私钥凭据 ID（需在 Jenkins 凭据中创建，或改用它已有凭据的 ID）')
     }
 
     stages {
@@ -71,7 +68,7 @@ pipeline {
                 expression { params.DEPLOY_HOST?.trim()?.length() > 0 }
             }
             steps {
-                withCredentials([sshUserPrivateKey(credentialsId: env.DEPLOY_SSH_CREDENTIALS_ID, keyFileVariable: 'SSH_KEY')]) {
+                withCredentials([sshUserPrivateKey(credentialsId: params.DEPLOY_SSH_CREDENTIALS_ID, keyFileVariable: 'SSH_KEY')]) {
                     script {
                         def remote = "${params.DEPLOY_USER}@${params.DEPLOY_HOST}"
                         def ssher = "-i \$SSH_KEY -p ${params.DEPLOY_SSH_PORT} -o StrictHostKeyChecking=no"
