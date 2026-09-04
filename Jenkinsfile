@@ -1,102 +1,55 @@
-// =====================================================================
-// mall-web 前端 Jenkins 流水线
+// ============================================================================
+// mall-web 前端 Jenkins 流水线（构建 dist + rsync over ssh 部署到 mall nginx）
 //
-// 流程:
-//   Checkout(内置) → 取镜像Tag → Docker 构建(依赖安装+前端构建在镜像内)
-//                  → (可选)推送镜像仓库 → 通过 SSH 部署容器到 Docker 主机
+// 流程：Checkout(内置) -> 构建 dist(node 容器) -> (可选) rsync 部署
 //
-// 前置条件:
-//   1. Jenkins 插件: Pipeline、Credentials Binding、SSH Agent、
-//      Timestamper、Blue Ocean(可选)、Workspace Cleanup(可选)
-//   2. Jenkins Agent 节点需具备: git、docker CLI（依赖安装/前端构建在镜像内的 node 完成，无需 node/corepack）
-//   3. 在 Jenkins "凭据" 中创建:
-//        - username/password 类型, 凭据 ID: registry-credentials
-//          (镜像仓库账号; 仅当使用 PUSH_REGISTRY 时需要)
-//        - SSH Username with private key 类型, 凭据 ID: deploy-ssh-key
-//          (用于 SSH 到部署主机执行 docker 命令)
-//   4. 在 Jenkins 任务里配置 "参数化构建过程"，或直接按下方 parameters 填值。
-//      本项目未硬编码任何服务器地址/密码，均为运行时参数。
+// 说明：
+//   - 复用 mall 仓库已部署的 nginx（容器名 nginx，宿主 8088，前端静态根 /data/mall/web）。
+//     本流水线只把前端 dist 同步到该 nginx 的宿主静态目录，不再构建/启动第二个 nginx。
+//   - dist 在 node:22-alpine 容器内构建（agent 无需装 node/corepack，仅需 docker CLI 且能取到该镜像）。
+//   - 部署用 rsync over ssh（目标机也需 rsync；agent 无 rsync 时回退 tar|ssh）。
 //
-// 说明:
-//   * 若 REGISTRY_URL 非空并启用 PUSH_REGISTRY，镜像会推送并部署主机 docker pull；
-//   * 若 REGISTRY_URL 为空，则走本地 docker save | ssh 主机 docker load 传输，
-//     无需额外镜像仓库。
-// =====================================================================
+// 前置条件：
+//   1. Jenkins 插件：Pipeline、Timestamper、SSH Agent、Git
+//   2. Jenkins Agent：git、docker CLI、ssh、rsync(可选)
+//   3. Jenkins 凭据：SSH Username + private key，ID=deploy-ssh-key（供 rsync/ssh 到目标机）
+//   4. 目标机：/data/mall/web 可写（即 mall nginx 的静态根）
+// ============================================================================
 pipeline {
     agent any
 
     options {
         timestamps()
         disableConcurrentBuilds()
-        buildDiscarder(logRotator(numToKeepStr: '10'))
+        buildDiscarder(logRotator(numToKeepStr: '15'))
     }
 
     parameters {
         choice(name: 'BUILD_MODE', choices: ['pro', 'test'], description: '构建模式，对应 pnpm build:pro / build:test')
-        string(name: 'IMAGE_TAG', defaultValue: '', description: '镜像标签，留空则使用 Git 短 SHA')
-        string(name: 'APP_NAME', defaultValue: 'mall-web', description: '容器名/镜像名前缀')
-        string(name: 'HOST_PORT', defaultValue: '8080', description: '宿主端口映射(容器80)。若外层 nginx 通过 docker 网络按容器名访问，请留空')
-        string(name: 'DOCKER_NETWORK', defaultValue: 'webnet', description: '容器接入的自定义 docker 网络（与已部署 nginx 同网即可被代理）')
-        string(name: 'REGISTRY_URL', defaultValue: '', description: '镜像仓库地址，例如 registry.example.com/library；留空=不做仓库推送')
-        booleanParam(name: 'PUSH_REGISTRY', defaultValue: false, description: '是否推送镜像到 REGISTRY_URL（需配置仓库凭据）')
-        string(name: 'DEPLOY_HOST', defaultValue: '', description: '部署目标主机 IP/域名；留空则跳过部署')
-        string(name: 'DEPLOY_USER', defaultValue: 'root')
-        string(name: 'DEPLOY_SSH_PORT', defaultValue: '22')
+        string(name: 'STATIC_ROOT', defaultValue: '/data/mall/web', description: 'mall nginx 的宿主静态根目录（部署目标）')
+        string(name: 'DEPLOY_HOST', defaultValue: '', description: '目标主机 IP/域名；留空则只构建不部署')
+        string(name: 'DEPLOY_USER', defaultValue: 'root', description: 'SSH 部署用户')
+        string(name: 'DEPLOY_SSH_PORT', defaultValue: '22', description: 'SSH 端口')
     }
 
     environment {
-        // 凭据 ID（在 Jenkins 凭据中配置，ID 本身非机密）
-        REGISTRY_CREDENTIALS_ID = 'registry-credentials'
         DEPLOY_SSH_CREDENTIALS_ID = 'deploy-ssh-key'
     }
 
     stages {
         stage('Checkout') {
+            steps { checkout scm }
+        }
+
+        stage('构建 dist (node 容器)') {
             steps {
-                checkout scm
+                sh "docker run --rm -v \"\$PWD\":/app -w /app node:22-alpine sh -c 'corepack enable && corepack prepare pnpm@9.15.0 --activate && pnpm install --frozen-lockfile && pnpm build:${params.BUILD_MODE}'"
+                sh 'test -d dist && echo "[OK] dist 目录存在"'
+                archiveArtifacts artifacts: 'dist/**', fingerprint: true
             }
         }
 
-        stage('初始化') {
-            steps {
-                script {
-                    def shortSha = env.GIT_COMMIT ? env.GIT_COMMIT.take(7) : 'build'
-                    def tag = params.IMAGE_TAG.trim()
-                    def reg = params.REGISTRY_URL.trim()
-                    def host = params.DEPLOY_HOST.trim()
-                    env.IMAGE_TAG = tag.isEmpty() ? shortSha : tag
-                    env.IMAGE_NAME = reg.isEmpty() ? params.APP_NAME : "${reg}/${params.APP_NAME}"
-                    echo "=> 镜像: ${env.IMAGE_NAME}:${env.IMAGE_TAG}  模式: ${params.BUILD_MODE}  部署主机: ${host.isEmpty() ? '(未配置,跳过部署)' : host}"
-                }
-            }
-        }
-
-        stage('构建 Docker 镜像') {
-            steps {
-                sh "docker build -f Dockerfile -t ${env.IMAGE_NAME}:${env.IMAGE_TAG} --build-arg BUILD_MODE=${params.BUILD_MODE} ."
-            }
-        }
-
-        stage('推送镜像仓库') {
-            when {
-                expression { params.PUSH_REGISTRY && params.REGISTRY_URL?.trim()?.length() > 0 }
-            }
-            steps {
-                withCredentials([usernamePassword(credentialsId: env.REGISTRY_CREDENTIALS_ID,
-                                                  usernameVariable: 'REG_USER',
-                                                  passwordVariable: 'REG_PASS')]) {
-                    sh """
-                        set -e
-                        echo "\${REG_PASS}" | docker login "${params.REGISTRY_URL}" -u "\${REG_USER}" --password-stdin
-                        docker tag ${env.IMAGE_NAME}:${env.IMAGE_TAG} ${env.IMAGE_NAME}:latest
-                        docker push ${env.IMAGE_NAME}:${env.IMAGE_TAG}
-                        docker push ${env.IMAGE_NAME}:latest
-                    """
-                }
-            }
-        }
-
-        stage('部署到 Docker 主机') {
+        stage('部署到 mall nginx') {
             when {
                 expression { params.DEPLOY_HOST?.trim()?.length() > 0 }
             }
@@ -104,30 +57,20 @@ pipeline {
                 sshagent([env.DEPLOY_SSH_CREDENTIALS_ID]) {
                     script {
                         def remote = "${params.DEPLOY_USER}@${params.DEPLOY_HOST}"
-                        def sshOpts = "-p ${params.DEPLOY_SSH_PORT} -o StrictHostKeyChecking=no"
-
-                        // 无仓库时，把本地镜像直接传到部署主机
-                        if (params.REGISTRY_URL?.trim()?.length() == 0) {
-                            sh "docker save ${env.IMAGE_NAME}:${env.IMAGE_TAG} | ssh ${sshOpts} ${remote} 'docker load'"
-                        }
-
-                        // 远程运行脚本：停止旧容器 → 确保网络 → 启动新容器
-                        def runScript = """
+                        def ssher = "-p ${params.DEPLOY_SSH_PORT} -o StrictHostKeyChecking=no"
+                        def root = params.STATIC_ROOT.trim()
+                        sh """
                             set -e
-                            APP="${params.APP_NAME}"
-                            IMG="${env.IMAGE_NAME}:${env.IMAGE_TAG}"
-                            NET="${params.DOCKER_NETWORK}"
-                            PORT="${params.HOST_PORT}"
-                            REG="${params.REGISTRY_URL}"
-                            docker rm -f "\$APP" 2>/dev/null || true
-                            docker network inspect "\$NET" >/dev/null 2>&1 || docker network create "\$NET"
-                            if [ -n "\$REG" ]; then docker pull "\$IMG"; fi
-                            PUBLISH=""
-                            [ -n "\$PORT" ] && PUBLISH="-p \${PORT}:80"
-                            docker run -d --name "\$APP" --restart unless-stopped \$PUBLISH --network "\$NET" "\$IMG"
-                            echo "=> deployed: \$(docker ps --filter name=\$APP --format '{{.Names}} -> {{.Status}} | {{.Image}}')"
+                            echo '==> 部署到 ${remote}:${root}/'
+                            if command -v rsync >/dev/null 2>&1; then
+                                rsync -az --delete -e 'ssh ${ssher}' dist/ ${remote}:${root}/
+                                echo '[OK] rsync 部署完成'
+                            else
+                                echo '==> rsync 不可用，改用 tar|ssh'
+                                tar -C dist -cf - . | ssh ${ssher} ${remote} 'tar -C ${root} -xf -'
+                                echo '[OK] tar|ssh 部署完成（不会自动删除多余旧文件）'
+                            fi
                         """
-                        sh "ssh ${sshOpts} ${remote} 'bash -s' <<'REMOTE'\n${runScript}\nREMOTE"
                     }
                 }
             }
