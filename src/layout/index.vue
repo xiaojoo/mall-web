@@ -102,6 +102,11 @@ onBeforeUnmount(() => {
   }
 
   .layout-main {
+
+    /* 内容区保持最小宽度(1280)：窄屏时横向滚动, 内容不换行所以不产生纵向滚动 */
+    > * {
+      min-width: 80rem;
+    }
     flex: 1;
     min-height: 0;
     background-color: $base-bg-color;
