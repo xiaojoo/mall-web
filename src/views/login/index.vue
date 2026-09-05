@@ -92,7 +92,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import * as yup from 'yup'
 import useUserStore from '@/store/modules/user'
 import { useRouter, useRoute } from 'vue-router'
@@ -211,6 +211,9 @@ const limitInput = (
 
 // 初始化加载验证码
 loadCaptcha()
+// 登录页挂载/卸载切换 body 类以覆盖全局 body{min-width:80rem} 的横向滚动
+onMounted(() => document.body.classList.add('login-page'))
+onUnmounted(() => document.body.classList.remove('login-page'))
 </script>
 
 <style lang="scss" scoped>
@@ -394,5 +397,11 @@ input:focus {
     min-width: 0;
     padding: 1.25rem;
   }
+}
+</style>
+<style>
+body.login-page {
+  min-width: 0 !important;
+  overflow-x: hidden !important;
 }
 </style>
