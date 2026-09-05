@@ -215,10 +215,10 @@ loadCaptcha()
 
 <style lang="scss" scoped>
 .login-container {
+  position: fixed;
+  inset: 0;
   display: flex;
   width: 100%;
-  height: 100vh;
-  min-height: 100vh;
   overflow: hidden;
   background: url('@/assets/images/background.jpg') no-repeat center center;
   background-size: cover;
