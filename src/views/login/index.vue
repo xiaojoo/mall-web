@@ -218,6 +218,7 @@ loadCaptcha()
   display: flex;
   width: 100%;
   height: 100vh;
+  min-height: 100vh;
   overflow: hidden;
   background: url('@/assets/images/background.jpg') no-repeat center center;
   background-size: cover;
@@ -384,12 +385,14 @@ input:focus {
 
   .login-right {
     width: 100%;
+    min-width: 0;
+    padding: 1rem;
   }
 
   .login-form {
     max-width: 100%;
-    padding: 1.5rem;
+    min-width: 0;
+    padding: 1.25rem;
   }
 }
 </style>
-  overflow: hidden;
