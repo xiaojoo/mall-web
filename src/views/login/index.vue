@@ -218,19 +218,24 @@ loadCaptcha()
   display: flex;
   width: 100%;
   height: 100vh;
+  overflow: hidden;
   background: url('@/assets/images/background.jpg') no-repeat center center;
   background-size: cover;
 }
 
 .login-left {
-  flex: 6;
+  flex: 1 1 0;
+  min-width: 0;
   display: flex;
   justify-content: center;
   align-items: center;
 }
 
 .login-right {
-  flex: 4;
+  flex: 0 0 auto;
+  width: 45%;
+  min-width: 340px;
+  max-width: 640px;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -249,6 +254,8 @@ loadCaptcha()
 .login-form {
   width: 100%;
   max-width: 650px;
+  min-width: 300px;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   padding: 2rem;
@@ -385,3 +392,4 @@ input:focus {
   }
 }
 </style>
+  overflow: hidden;
