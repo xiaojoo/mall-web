@@ -7,7 +7,7 @@
 html,
 body {
   min-width: 0;
-  overflow-x: hidden;
+  overflow: hidden;
 }
 
 /* 应用根固定铺满视口：页面不再出现窗口滚动条，内容滚动由布局内部 .layout-main(overflow:auto) 承担 */
