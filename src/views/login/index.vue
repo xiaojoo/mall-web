@@ -212,8 +212,8 @@ const limitInput = (
 // 初始化加载验证码
 loadCaptcha()
 // 登录页挂载/卸载切换 body 类以覆盖全局 body{min-width:80rem} 的横向滚动
-onMounted(() => document.body.classList.add('login-page'))
-onUnmounted(() => document.body.classList.remove('login-page'))
+onMounted(() => { document.documentElement.classList.add('login-page'); document.body.classList.add('login-page') })
+onUnmounted(() => { document.documentElement.classList.remove('login-page'); document.body.classList.remove('login-page') })
 </script>
 
 <style lang="scss" scoped>
@@ -400,8 +400,11 @@ input:focus {
 }
 </style>
 <style>
+html.login-page,
 body.login-page {
   min-width: 0 !important;
-  overflow-x: hidden !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  height: 100%;
 }
 </style>
