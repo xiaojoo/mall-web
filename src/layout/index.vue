@@ -63,7 +63,7 @@ onBeforeUnmount(() => {
 .layout-container {
   display: flex;
   /* 最小宽度：达到后不再缩小，视口更小时 body 出现横向滚动 */
-  min-width: 80rem;
+  min-width: 0;
   height: 100vh;
   background-color: $base-bg-color;
   overflow: hidden;
