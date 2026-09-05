@@ -10,6 +10,14 @@ body {
   overflow-x: hidden;
 }
 
+/* 应用根固定铺满视口：页面不再出现窗口滚动条，内容滚动由布局内部 .layout-main(overflow:auto) 承担 */
+html {
+  height: 100%;
+}
+#app {
+  height: 100vh;
+  overflow: hidden;
+}
 /* 折叠菜单宽度与侧边栏 $base-menu-min-with(3.9375rem) 对齐，
    Element Plus 默认折叠宽度为 64px，差 1px 会导致横向滚动条/错位 */
 .el-menu--collapse {
