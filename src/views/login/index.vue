@@ -64,7 +64,7 @@
               name="captcha"
               placeholder="请输入验证码"
               v-model="loginForm.captcha"
-              @input="limitInput('captcha', 6)"
+              @input="limitInput('captcha', 4)"
             />
             <img
               :src="captchaSrc"
@@ -111,7 +111,7 @@ const schema = yup.object({
     .required('密码不能为空')
     .min(4, '密码至少 6 个字符')
     .max(16, '密码最多 16 个字符'),
-  captcha: yup.string().required('验证码不能为空').length(5, '验证码必须是5位'),
+  captcha: yup.string().required('验证码不能为空').length(4, '验证码必须是4位'),
 })
 
 // 表单数据
